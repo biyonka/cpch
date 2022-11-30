@@ -1,2 +1,1 @@
-# cpch
-Powerful Partial Conjunction Hypothesis Testing\\ via Conditioning
+# cPCH: Powerful Partial Conjunction Hypothesis Testing via Conditioning
