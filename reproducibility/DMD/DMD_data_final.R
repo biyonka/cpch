@@ -4,6 +4,10 @@ library(ggplot2)
 library(GEOquery)
 
 setwd("~/Document/Research/cpch/DMD") #change directory to where the .rda and .csv data files are located
+
+## Much of the following code is adapted heavily from pre-processing code written by
+#Jingshu Wang, which was used to analyze these datasets for the AdaFilter paper
+#https://arxiv.org/pdf/1610.03330.pdf
 load("gds214.rda")
 load("gds3027.rda")
 load("gds1956.rda")
@@ -57,7 +61,6 @@ getYData <- function(gds.name, gplmat) {
 }
 
 
-## copy-paste functions from example_DMD_code.R
 getP <- function(X.data, Y.data, do.cate = T,
                  r = -1,
                  contrasts = NULL) {
@@ -68,7 +71,6 @@ getP <- function(X.data, Y.data, do.cate = T,
     print(r2)
     if (r < 0)
       r <- r2
-    #  r1 <- est.confounder.num(~group, X.data, Y.data)
     print(r)
     result <- cate(~group|. - group, X.data, Y.data, r = r)
     p1 <- result$beta.p.value
@@ -78,17 +80,15 @@ getP <- function(X.data, Y.data, do.cate = T,
   
   library(limma)
   model.x <- model.matrix(~., X.data)
-  #their input was t(Y.data) but the dimensions didn't match properly so I changed it to Y.Data
   fit1 <- lmFit(Y.data, model.x)
   if (is.null(contrasts))
     fit2 <- contrasts.fit(fit1, c(0, 1))
   else
     fit2 <- contrasts.fit(fit1, contrasts)
-  #changed this to eBayes instead of ebayes (ebayes is an old version that is no longer supported, but should output same result)
+  
   limma.result <- eBayes(fit2)
   t2 <- limma.result$t
   t2 <- (t2 - median(t2)) / mad(t2 - median(t2))
-  #p2 <- limma.result$p.value
   p2 <- 2 * pnorm(-abs(t2))
   return(list(z.stat = t2, p.limma = p2))
 }
@@ -122,63 +122,6 @@ gplReshape <- function(gplmat) {
   
 }
 
-CompPVec <- function(X.data, Y.data, gplmat,
-                     contrasts = NULL, r= -1,
-                     use.limma = F) {
-  if (use.limma)
-    do.cate <- F
-  else
-    do.cate <- T
-  
-  result <- getP(X.data, Y.data, contrasts = contrasts, r = r,
-                 do.cate = do.cate)
-  if (use.limma)
-    pvalue <- as.vector(result$p.limma)
-  else 
-    pvalue <- as.vector(result$p.cate)
-  #  print(head(pvalue))
-  pmat <- data.frame(ID1 = rownames(result$p.limma),
-                     pvalue = pvalue)
-  gplmat['ID_check'] = gplmat$ID
-  temp <- merge(pmat, gplmat, by.x = 'ID1', by.y = 'ID', all.y = TRUE)
-  #temp = cbind(pmat[gplmat$idx, ], gplmat)
-  #print(temp)
-  #  print(sum(as.character(temp$ID1) != as.character(temp$ID)) == 0)
-  pvec <-temp[, c('pvalue', 'Gene.symbol')]## temp[, c(2, 5)]#
-  pvec = pvec[order(pvec$Gene.symbol),]
-  symbols <- pvec$Gene.symbol
-  uni.symbols <- unique(symbols)
-  p.group = c()
-  index <- 1
-  temp.group <- c()
-  #for each unique gene, create a temp group that keeps track of the p-values that are repeated
-  for (i in uni.symbols) {
-    #  print(i)
-    while (symbols[index] == i) {
-      temp.group <- c(temp.group, pvec[index, 1]) #1
-      #print(temp.group)
-      index <- index + 1
-      if (index > nrow(pvec))
-        break
-    }
-    #bonferroni correction happening here
-    #we could just change this to a average of the corresponding z-scores
-    if (sum(is.na(temp.group)) == length(temp.group)){
-      p.group = c(p.group, NA)
-    }
-    else {
-      p <- min(min(temp.group, na.rm = TRUE) * length(temp.group[!is.na(temp.group)]), 1)
-      p.group <- c(p.group, p)
-    }  
-    temp.group <- c()
-  }
-  
-  pvec <- data.frame(Gene.symbol = uni.symbols,
-                     pvalue = p.group)
-  
-  
-}
-
 
 CompPVec_new <- function(X.data, Y.data, gplmat,
                          contrasts = NULL, r= -1,
@@ -199,11 +142,9 @@ CompPVec_new <- function(X.data, Y.data, gplmat,
                      pvalue = pvalue)
   gplmat['ID_check'] = gplmat$ID
   temp <- merge(pmat, gplmat, by.x = 'ID1', by.y = 'ID', all.y = TRUE)
-  #temp = cbind(pmat[gplmat$idx, ], gplmat)
+  
   print(temp)
-  # print(temp1)
-  #  print(sum(as.character(temp$ID1) != as.character(temp$ID)) == 0)
-  pvec <-temp[, c('pvalue', 'z.stat', 'Gene.symbol')]# temp[, c('pvalue', 'Gene.symbol')] # temp[, c(2, 5)]#
+  pvec <-temp[, c('pvalue', 'z.stat', 'Gene.symbol')]
   pvec = pvec[order(pvec$Gene.symbol),]
   symbols <- pvec$Gene.symbol
   uni.symbols <- unique(symbols)
@@ -216,13 +157,11 @@ CompPVec_new <- function(X.data, Y.data, gplmat,
     #  print(i)
     while (symbols[index] == i) {
       temp.group <- c(temp.group, pvec[index, 2]) #1
-      #print(temp.group)
       index <- index + 1
       if (index > nrow(pvec))
         break
     }
-    #bonferroni correction happened here in jingshu's paper
-    #we could just change this to a average of the corresponding z-scores
+    #average corresponding z-scores and rescale appropriately
     if (sum(is.na(temp.group)) == length(temp.group)){
       p.group = c(p.group, NA)
       z.group = c(z.group, NA)
@@ -303,6 +242,6 @@ pmat_to_save['ada_decision_r_4'] = result$decision
 hist(pmat_to_save$ts.4)
 
 #change directory to where you want the csv to be saved
-write.csv(pmat_to_save, '~/Documents/Research/cpch/Data/dmd.csv', row.names = FALSE) 
+write.csv(pmat_to_save, '~/Documents/Research/minmax/Data/dmd.csv', row.names = FALSE) 
 
 

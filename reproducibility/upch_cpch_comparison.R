@@ -1,4 +1,4 @@
-setwd("~/Documents/Research/minmax/cpch") #set directory to where this file is located locally
+setwd("~/Documents/Research/cpch") #set directory to where this file is located locally
 set.seed(21)
 
 library(ggplot2)

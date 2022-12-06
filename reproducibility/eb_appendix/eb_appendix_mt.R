@@ -231,6 +231,6 @@ alt_res = lapply(alt_cases, calc_cases, M, c(mag, mag), alpha, power_iters)
 null_res = lapply(null_cases, calc_null_cases, M, c(mag, mag), alpha, power_iters)
 
 #set file directory to where you want the file to be saved
-save(alt_res, null_res, file = paste0("eb_appendix_",M,"_new_cpch.rda"))
+save(alt_res, null_res, file = paste0("eb_appendix_",M,".rda"))
 
 

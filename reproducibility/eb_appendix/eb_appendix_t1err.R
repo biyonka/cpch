@@ -134,6 +134,6 @@ colnames(t1_error_l) = c( 'nonzero_mu', 'method', 't1_error')
 t1_error_l$method <- factor(t1_error_l$method, levels = c('cPCH', 'adaFilter', 'DACT', 'Max-P'))
 
 #change path to where you want data to be saved
-write.csv(t1_error_l, file = sprintf("t1_error_mu_%1.0f_a_%.2f_M_%1.0f_newcpch.csv", max_null_mu, alpha, repl),  row.names = FALSE)
+write.csv(t1_error_l, file = sprintf("t1_error_mu_%1.0f_a_%.2f_M_%1.0f.csv", max_null_mu, alpha, repl),  row.names = FALSE)
 
 
