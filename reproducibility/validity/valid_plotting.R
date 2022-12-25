@@ -24,61 +24,6 @@ labelling = function(string){paste0('m = ', string, ', r = 2')}
 qq_3_2$n_lab = sapply(qq_3_2 $m, labelling)
 
 
-# cpch_qqplot_fisher = ggplot(combined, aes(sample = cpch_f, color = nonzero_mus)) + 
-#   geom_qq(aes(color = nonzero_mus), size = 0.3, distribution = stats::qunif) +
-#   facet_wrap(~n_lab) +
-#   theme_light() +
-#   theme(strip.text = element_text(colour = 'black')) +
-#   theme(strip.background =element_rect(fill="lightgray")) + 
-#   geom_abline(slope = 1, intercept = 0) +
-#   guides(colour = guide_legend(override.aes = list(size=2))) + 
-#   labs('color' = expression(theta[(m)]))  + xlab('Theoretical Unif[0, 1]') + 
-#   ylab('Empirical cPCH')+
-#   theme(aspect.ratio = 1,strip.text.x = element_text(size = 20),
-#         axis.title =element_text(size=20), axis.text = element_text(size = 15),
-#         legend.title=element_text(size=20), legend.text=element_text(size=15),
-#         panel.border = element_blank())
-# 
-# cpch_qqplot_simes = ggplot(combined, aes(sample = cpch_s, color = nonzero_mus)) + 
-#   geom_qq(aes(color = nonzero_mus), size = 0.3, distribution = stats::qunif) + facet_wrap(~n_lab) +
-#   geom_abline(slope = 1, intercept = 0) +
-#   theme_light() +
-#   theme(strip.text = element_text(colour = 'black')) +
-#   theme(strip.background =element_rect(fill="lightgray")) + 
-#   guides(colour = guide_legend(override.aes = list(size=2))) + 
-#   labs('color' = expression(theta[(m)]))  + xlab('Theoretical Unif[0, 1]') + 
-#   ylab('Empirical cPCH')+
-#   theme(aspect.ratio = 1,strip.text.x = element_text(size = 20),
-#         axis.title =element_text(size=20), axis.text = element_text(size = 15),
-#         legend.title=element_text(size=20), legend.text=element_text(size=15),
-#         panel.border = element_blank())
-# 
-# cpch_qqplot_bonferroni = ggplot(combined, aes(sample = cpch_b, color = nonzero_mus)) + 
-#   geom_qq(aes(color = nonzero_mus), size = 0.3, distribution = stats::qunif) + facet_wrap(~n_lab) +
-#   geom_abline(slope = 1, intercept = 0) +
-#   theme_light() +
-#   theme(strip.text = element_text(colour = 'black')) +
-#   theme(strip.background =element_rect(fill="lightgray")) + 
-#   guides(colour = guide_legend(override.aes = list(size=2))) + 
-#   labs('color' = expression(theta[(m)])) + xlab('Theoretical Unif[0, 1]') + 
-#   ylab('Empirical cPCH')+
-#   theme(aspect.ratio = 1,strip.text.x = element_text(size = 20),
-#         axis.title =element_text(size=20), axis.text = element_text(size = 15),
-#         legend.title=element_text(size=20), legend.text=element_text(size=15), 
-#         panel.border = element_blank())
-# 
-# #Set directories to where you want plots to be saved
-# ggsave(filename = "cpch_qqplot_fisher_new.png",
-#        plot = cpch_qqplot_fisher, path = 'Plots', bg = 'white', 
-#        height = 7, width = 15)
-# ggsave(filename = "cpch_qqplot_bon_new.png",
-#        plot = cpch_qqplot_bonferroni, path = 'Plots',
-#        bg = 'white', height = 7, width = 15)
-# ggsave(filename = "cpch_qqplot_simes_new.png",
-#        plot = cpch_qqplot_simes, path = 'Plots',
-#        bg = 'white', height = 7, width = 15)
-
-
 qq_2_2 = combined[combined$m == 2 & combined$r == 2, ]
 qq_2_2$n_lab = 'r = m = 2'
 
@@ -171,7 +116,7 @@ get_nonzero_mu = function(mu_vec){
 nonzero_mu = sapply(qq_3_3$mu, get_nonzero_mu)
 qq_3_3$nonzero_mus = nonzero_mu
 
-lol = ggplot(qq_3_3, aes(sample = cpch_f, color = mu)) + 
+qq_33 = ggplot(qq_3_3, aes(sample = cpch_f, color = mu)) + 
   geom_qq(aes(color = mu), size = 0.3, distribution = stats::qunif) +
   theme_light() +
   theme(strip.text = element_text(colour = 'black')) +
@@ -179,18 +124,9 @@ lol = ggplot(qq_3_3, aes(sample = cpch_f, color = mu)) +
   geom_abline(slope = 1, intercept = 0) +
   # guides(colour = guide_legend(override.aes = list(size=2))) + 
   labs('color' = expression(theta))  + xlab('Theoretical Unif[0, 1]') + 
-  ylab('Empirical cPCH') # + 
- # theme(aspect.ratio = 1, strip.text.x = element_text(size = 30),
-   #     axis.title =element_text(size= 35), axis.text = element_text(size = 30),
-  #      legend.title=element_text(size = 35), legend.text=element_text(size=30), 
-   #     panel.border = element_blank())
-
-# + theme(aspect.ratio = 1,strip.text.x = element_text(size = 20),
-#       axis.title =element_text(size=20), axis.text = element_text(size = 15),
-#       legend.title=element_text(size=20), legend.text=element_text(size=15),
-#       panel.border = element_blank())
+  ylab('Empirical cPCH') 
 
 #Set directory to where you want plots to be saved
 ggsave(filename = "qq_3_3.png",
-       plot = lol, path = 'Plots', bg = 'white', 
+       plot = qq_33, path = 'Plots', bg = 'white', 
        height = 7, width = 20)

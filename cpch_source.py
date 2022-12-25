@@ -56,9 +56,7 @@ def generate_S(m, r):
     @ param m: int, m>= 2, number of base hypotheses
     @ param r: int, 2 <= r <= m
 
-    Generates the first elements of each set in the set S as presented in the Computing cPCH p-values section of the paper
-    Outputs a list of lists of all the ways to have one element of X in the n-r+2 position, and
-    and some combination of the remaining in the 1 to n-r+1 positions
+    Generates the set S as presented in the Computing cPCH p-values section of the paper
     '''
     #gets all combinations of length n-r+1 from range(1, 2, ..., n)
     S = list(itertools.combinations(list(np.arange(1, m+1, 1)), m-r+1))
@@ -246,8 +244,9 @@ def get_T_big(T, m, r):
     M = T.shape[0]
     idx = (np.abs(T).argsort(axis=1).argsort(axis = 1) >= m-r+1)
     T_big = T[idx].reshape(M, r-1)
-    sorted_T_big = np.sign(T_big)[0][np.argsort(np.abs(T_big), axis = 1)[0]] * np.sort(np.abs(T_big), axis = 1)
-    return sorted_T_big
+    arr_inds = np.argsort(np.abs(T_big), axis = 1)
+    final_t_big = np.take_along_axis(np.sign(T_big),arr_inds,axis=1)* np.sort(np.abs(T_big), axis = 1)
+    return final_t_big
 
 def get_oracle_theta(true_theta, T, m, r):
     '''
@@ -616,7 +615,6 @@ def cpch(T, m, r, f, pdf = norm.pdf, cdf = None, trunc_rvs = None, N = 10000, do
     if m == 2 and r == 2 and pdf == norm.pdf:
         return (cpch_m2_r2(T, m, r))
     S = generate_S(m, r)
-    #H = get_S_complement(m, S)
     T_big = get_T_big(T, m, r)
     thetahat, Ts = get_thetahat_T_small(T, m, r)
     if pdf == norm.pdf:
@@ -651,7 +649,6 @@ def cpch_oracle(T, m, r, f, true_loc, pdf = norm.pdf, cdf = None, trunc_rvs = No
     if pdf == t.pdf and dof == []:
         raise ValueError("pdf is t.pdf but no DOF matrix provided")
     S = generate_S(m, r)
-    #H = get_S_complement(m, S)
     repl = T.shape[0]
     T_big = get_T_big(T, m, r)
     thetahat, Ts = get_thetahat_T_small(T, m, r)
