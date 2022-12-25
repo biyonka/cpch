@@ -68,33 +68,13 @@ def generate_S(m, r):
     for ls in S:
         remaining.append(list(list(set(np.arange(1, m+1, 1))-set(ls))))
     test = []
-    #knit together all possible sets of the n-r+1 and one choice of the remaining elements
     for i in np.arange(len(S)):
-        rest = S[i]
-        nr2 = remaining[i]
-        test.append(list(itertools.product([rest], nr2)))
-    final = list(chain.from_iterable(test))
-    return final
-
-
-
-def get_S_complement(m, S):
-    '''
-    @ param m: int, m>= 2, number of base hypotheses
-    @ param S: A list of lists of all the ways to have one element of X in the n-r+2 position, and
-    and some combination of the remaining in the 1 to n-r+1 positions
-
-    Generates the second element of each set in the set S as presented in the Computing cPCH p-values section of the paper
-    Outputs the complements of each element in S, a list of lists where each inner list contains the
-    indices not included in each of the sets in S (i.e., T_{(m-r+2:m)})
-    '''
-    S_comp = []
-    for ls in S:
-        cond_cutoff_vec = copy.deepcopy(list(ls)[0])
-        cond_cutoff_vec.append(list(ls)[1])
-        cond_cutoff_vec = np.array(cond_cutoff_vec)
-        S_comp.append(list(set(np.arange(1, m+1, 1))-set(cond_cutoff_vec)))
-    return(S_comp)
+        small = S[i]
+        rest = remaining[i]
+        all_perms = list(itertools.permutations(rest))
+        final = list(itertools.product([small], all_perms))
+        test.append(final)
+    return(list(chain.from_iterable(test)))
 
 ####################################
 # Generate Data for MT Experiments #
@@ -266,7 +246,8 @@ def get_T_big(T, m, r):
     M = T.shape[0]
     idx = (np.abs(T).argsort(axis=1).argsort(axis = 1) >= m-r+1)
     T_big = T[idx].reshape(M, r-1)
-    return np.sign(T_big) * np.sort(np.abs(T_big), axis = 1) #(np.sort(np.abs(T), axis=1)[:, m-r+1:])
+    sorted_T_big = np.sign(T_big)[0][np.argsort(np.abs(T_big), axis = 1)[0]] * np.sort(np.abs(T_big), axis = 1)
+    return sorted_T_big
 
 def get_oracle_theta(true_theta, T, m, r):
     '''
@@ -349,18 +330,16 @@ def cpch_m2_r2_orac(T, m, r, true_loc):
     return(pvals)
 
 
-def cpch_mc_norm(Ts, S, H, f, null_theta, T_big, N):
+def cpch_mc_norm(Ts, S, f, null_theta, T_big, N):
     '''
     Performs the MC sampling scheme outlined in the Computation section and outputs the cpch p-value
     Ts: A repl x 2 matrix of the m-r+1 smallest test statistics we observed
-    S: A list of lists containing all the ways to have one element of X in the m-r+2 position, and
-    and some combination of the remaining in the 1 to m-r+1 positions
-    H: a list of lists containing all elements of X_i not in each element of S
+    S: A list of lists containing all the ways to some combination T1, ..., Tm corresponding to T_(1:m-r+1), and some ordered sets
+    corresponding to the remaining order stats
+    f: the function to use on the samples, takes in a N x n-r+1 dimensional matrix (N = 1, 2, ...)
+    null_theta: repl x n matrix of theta_hats for each observation
+    T_big: repl x r-1 vector of the observed T_(m-r+2:m), sets truncation for truncated normal sampling
     N: The number of Monte Carlo simulations to run for the sampling
-    f: combining function to use on the base test statistics, takes in a N x m-r+1 dimensional matrix (N = 1, 2, ...)
-        and operates across rows to output a N length vector of function evaluations
-    null_theta: repl x m matrix of theta_hats for each observation
-    cond_thres: repl x 1 vector of the observed T_(m-r+2), sets truncation for truncated normal sampling
     '''
     Ts_pvals = 2 * (1-norm.cdf(np.abs(Ts), loc = 0, scale = 1))
     if f == f_simes or f == f_fisher:
@@ -374,41 +353,38 @@ def cpch_mc_norm(Ts, S, H, f, null_theta, T_big, N):
     cond_thres = T_big[:,0]
     joint_probs, null_ts_probs = [], []
     for i in np.arange(len(S)):
-        #keeps track of the theta values that correspond to the sets of order statistics
-
-        #each S[i][0] represents the set of X_i corresponding to the smallest order statistics
+        #each S[i][0] represents the set of T_i corresponding to the smallest order statistics
         small = S[i][0]
-        #indices: 1D array of indices corresponding to each X_i that correspond to the smallest order statistics
+        #indices: 1D array of indices corresponding to each T_i that correspond to the smallest order statistics
         indices = np.array(small) - 1
         #so we take these indices, and subset each row of theta_hat with this indices vector
-        #this gives us a repl x n-r+1 matrix of the predicted theta for the X_i corresponding to the smallest test statistics
+        #this gives us a repl x m-r+1 matrix of the theta for the T_i corresponding to the smallest test statistics
         small_theta = null_theta[:,indices]
+        #get T_(m-r+2)
+        theta_thres = null_theta[:, list(S[i][1])[0]-1]
 
-        #S[i][1]-1 represents the index of the X_i that corresponds to the n-r+2 order stat
-        #gives a repl x 1 array (picks out the S[i][1]-1th column of null_theta)
-        theta_thres = null_theta[:, S[i][1]-1]
-        #get list of mu corresponding to X_i larger than T_{(n-r+2)}, as long as it is not empty
-        if H[i] != []:
-            #np.array(H[i]) - 1: 1D array of indices that correspond to the order statistics n-r+3 and beyond
-            l_indices = np.array(H[i]) - 1
-            #so we take these indices, and subset each row of mu_hat with this indices vector
-            #this gives us a repl x r-2 matrix of the predicted mu for the X_i corresponding to the largest test statistics
-            large_theta = null_theta[:,l_indices]
-        else:
+
+        if len(S[i][1]) == 1:
             large_theta = []
-        # # calculate P(B*_i = 1|t3) terms
-        joint_prob_i = norm.pdf(cond_thres, loc = theta_thres, scale = 1)# + norm.pdf(-cond_thres, loc = theta_thres, scale = 1)
+        else:
+        #get list of mu corresponding to T_i larger than T_{(m-r+2)}, as long as it is not empty
+            l_indices = np.array(list(S[i][1])[1:]) - 1
+            #so we take these indices, and subset each row of mu_hat with this indices vector
+            #this gives us a repl x r-2 matrix of the predicted mu for the T_i corresponding to the largest test statistics
+            large_theta = null_theta[:,l_indices]
+
+        # # calculate P(B_i|T_{(m-r+2:m)}) terms
+        joint_prob_i = norm.pdf(cond_thres, loc = theta_thres, scale = 1)
         s_probs = norm.cdf(np.abs(cond_thres).reshape(repl, 1), loc = small_theta, scale = 1) - norm.cdf(-np.abs(cond_thres).reshape(repl, 1), loc = small_theta, scale = 1)
         #multiply together the columns so you're multiplying across the small_theta
         joint_prob_i *= np.prod(s_probs, axis = 1)
-        if H[0] != []:
-            l_probs = norm.pdf(T_big[:,1:], loc = large_theta, scale = 1)# + norm.pdf(-T_big[:,1:], loc = large_theta, scale = 1)
-            #1 - norm.cdf(cond_thres.reshape(repl, 1), loc = large_theta, scale = 1) + norm.cdf(-cond_thres.reshape(repl, 1), loc = large_theta, scale = 1)
+        if len(S[i][1]) > 1:
+            l_probs = norm.pdf(T_big[:,1:], loc = large_theta, scale = 1)
             joint_prob_i *= np.prod(l_probs, axis = 1)
         #joint probs will be a len(S) x repl matrix
         joint_probs.append(joint_prob_i)
 
-        #calculate P(f(X'_s) > f(x'_s)|t3) terms
+        #calculate P(f(T_(1:m-r+1)) > f^obs|T_{(m-r+2:m)}) terms
         # #sample from truncnorm with corresponding null_theta
         null_samples = []
         #loop over replications
@@ -424,12 +400,9 @@ def cpch_mc_norm(Ts, S, H, f, null_theta, T_big, N):
                     samp = truncnorm.rvs(a = -np.abs(cond_thres[i]) - small_theta[i,j], b = np.abs(cond_thres[i]) - small_theta[i,j], loc = small_theta[i,j], scale = 1, size = N)
                 samples.append(samp)
             null_samples.append(samples)
-       # print(np.array(null_samples))
         samples_pvals = 2 * (1-norm.cdf(np.abs(np.array(null_samples)), loc = 0, scale = 1))
-        #print(samples_pvals)
         if f == f_bonferroni:
-            #axis = 1 means apply this down the rows of each matrix in an array of matrices, which is what we want since each row of each matrix in null_samples
-            #represents a single sample
+            #axis = 1 means apply this down the rows of each matrix in an array of matrices, which is what we want since each row of each matrix in null_samples represents a single sample
             func_evals = f(np.array(null_samples), axis = 1)
             null_ts_probs.append((1 + np.sum(func_evals >= test_stat.reshape(repl, 1), axis = 1))/(N+1))
         elif f == f_fisher:
@@ -448,18 +421,18 @@ def cpch_mc_norm(Ts, S, H, f, null_theta, T_big, N):
     cpch_pvals = np.array(null_ts_probs) * cond_probs
     return np.sum(cpch_pvals, axis = 0)
 
-def cpch_mc_t(Ts, S, H, f, df, null_theta, T_big, N, df_Ts):
+def cpch_mc_t(Ts, S, f, df, null_theta, T_big, N, df_Ts):
     '''
     Performs the MC sampling scheme outlined in the Computation section and outputs the cpch p-value
-    Ts: A repl x 2 matrix of the n-r+1 smallest test statistics we observed
-    S: A list of lists containing all the ways to have one element of X in the m-r+2 position, and
-    and some combination of the remaining in the 1 to m-r+1 positions
-    H: a list of lists containing all elements of X_i not in each element of S
-    N: The number of Monte Carlo simulations to run for the sampling
-    f: the function to use on the samples, takes in a N x m-r+1 dimensional matrix (N = 1, 2, ...)
+    Ts: A repl x 2 matrix of the m-r+1 smallest test statistics we observed
+    S: A list of lists containing all the ways to some combination T1, ..., Tm corresponding to T_(1:m-r+1), and some ordered sets
+    corresponding to the remaining order stats
+    f: the function to use on the samples, takes in a N x n-r+1 dimensional matrix (N = 1, 2, ...)
     df: a repl x n matrix of degrees of freedom for each observation
-    null_theta: repl x m matrix of theta_hats for each observation
+    null_theta: repl x n matrix of theta_hats for each observation
     T_big: repl x r-1 vector of the observed T_(m-r+2:m), sets truncation for truncated normal sampling
+    N: The number of Monte Carlo simulations to run for the sampling
+    df_Ts: degrees of freedom corresponding to Ts
     '''
     Ts_pvals = 2 * (1-t.cdf(np.abs(Ts), df_Ts, loc = 0, scale = 1))
     if f == f_simes or f == f_fisher:
@@ -468,48 +441,44 @@ def cpch_mc_t(Ts, S, H, f, df, null_theta, T_big, N, df_Ts):
         test_stat = f(np.array(Ts), axis = 1)
     else:
         test_stat = f(np.array(Ts), axis = 1)
-    #generate the test stat to compare our samples to, just apply f along the rows of our given T_small matrix
     repl = Ts.shape[0]
-    #cond_thres is repl x 1 vector of the observed T_(m-r+2), sets truncation for truncated normal sampling
     cond_thres = T_big[:,0]
     joint_probs, null_ts_probs = [], []
     for i in np.arange(len(S)):
-        #keeps track of the theta values that correspond to the sets of order statistics
-
-        #each S[i][0] represents the set of X_i corresponding to the smallest order statistics
+        #each S[i][0] represents the set of T_i corresponding to the smallest order statistics
         small = S[i][0]
-        #indices: 1D array of indices corresponding to each X_i that correspond to the smallest order statistics
+        #indices: 1D array of indices corresponding to each T_i that correspond to the smallest order statistics
         indices = np.array(small) - 1
         #so we take these indices, and subset each row of theta_hat with this indices vector
-        #this gives us a repl x m-r+1 matrix of the predicted theta for the X_i corresponding to the smallest test statistics
+        #this gives us a repl x m-r+1 matrix of the predicted theta for the T_i corresponding to the smallest test statistics
         small_theta = null_theta[:,indices]
         small_df = df[:, indices]
-        #S[i][1]-1 represents the index of the X_i that corresponds to the m-r+2 order stat
+        #get the m-r+2 order stat
+        theta_thres = null_theta[:, list(S[i][1])[0]-1]
+        df_thres = df[:,  list(S[i][1])[0]-1]
         #gives a repl x 1 array (picks out the S[i][1]-1th column of null_theta)
-        theta_thres = null_theta[:, S[i][1]-1]
-        df_thres = df[:, S[i][1]-1]
-        #get list of theta corresponding to X_i larger than T_{(m-r+2)}, as long as it is not empty
-        if H[i] != []:
-            #np.array(H[i]) - 1: 1D array of indices that correspond to the order statistics n-r+3 and beyond
-            l_indices = np.array(H[i]) - 1
-            #so we take these indices, and subset each row of theta_hat with this indices vector
-            #this gives us a repl x r-2 matrix of the predicted theta for the X_i corresponding to the largest test statistics
-            large_theta = null_theta[:,l_indices]
-            large_df = df[:,l_indices]
-        else:
+        if len(S[i][1]) == 1:
             large_theta = []
             large_df = []
-        #  calculate P(B_i = 1|T_big) terms
-        joint_prob_i = t.pdf(cond_thres, df = df_thres, loc = theta_thres, scale = 1)# + t.pdf(-cond_thres, df = df_thres, loc = theta_thres, scale = 1)
-        s_probs = t.cdf(np.abs(cond_thres).reshape(repl, 1), df = small_df, loc = small_theta, scale = 1) - t.cdf(-np.abs(cond_thres).reshape(repl, 1), df = small_df, loc = small_theta, scale = 1)
+        else:
+        #get list of mu corresponding to T_i larger than T_{(m-r+2)}, as long as it is not empty
+            l_indices = np.array(list(S[i][1])[1:]) - 1
+            #so we take these indices, and subset each row of mu_hat with this indices vector
+            #this gives us a repl x r-2 matrix of the predicted mu for the T_i corresponding to the largest test statistics
+            large_theta = null_theta[:,l_indices]
+            large_df = df[:,l_indices]
+        # # calculate P(B_i|T_{(m-r+2:m)}) terms
+        joint_prob_i = norm.pdf(cond_thres, loc = theta_thres, scale = 1)
+        s_probs = norm.cdf(np.abs(cond_thres).reshape(repl, 1), loc = small_theta, scale = 1) - norm.cdf(-np.abs(cond_thres).reshape(repl, 1), loc = small_theta, scale = 1)
+        #multiply together the columns so you're multiplying across the small_theta
         joint_prob_i *= np.prod(s_probs, axis = 1)
-        if H[0] != []:
-            l_probs = t.pdf(T_big[:,1:], df = large_df, loc = large_theta, scale = 1)# + t.pdf(-T_big[:,1:], df = large_df, loc = large_theta, scale = 1)
+        if len(S[i][1]) > 1:
+            l_probs = norm.pdf(T_big[:,1:], loc = large_theta, scale = 1)
             joint_prob_i *= np.prod(l_probs, axis = 1)
         #joint probs will be a len(S) x repl matrix
         joint_probs.append(joint_prob_i)
 
-        #calculate P(f(T_small) > f(observed_T_small)|T_big) terms
+        #calculate P(f(T_(1:m-r+1)) > f^obs|T_{(m-r+2:m)}) terms
         # #sample from truncnorm with corresponding null_theta
         null_samples, null_pvals = [], []
 
@@ -546,17 +515,15 @@ def cpch_mc_t(Ts, S, H, f, df, null_theta, T_big, N, df_Ts):
     return np.sum(cpch_pvals, axis = 0)
 
 #sampling for general m and r
-def cpch_mc(Ts, S, H, f, pdf, cdf, trunc_rvs, null_theta, T_big, N):
+def cpch_mc(Ts, S, f, pdf, cdf, trunc_rvs, null_theta, T_big, N):
     '''
     Performs the MC sampling scheme outlined in the Computation section and outputs the cpch p-value
-    Ts: A repl x 2 matrix of the n-r+1 smallest test statistics we observed
-    S: A list of lists containing all the ways to have one element of X in the n-r+2 position, and
-    and some combination of the remaining in the 1 to n-r+1 positions
-    H: a list of lists containing all elements of X_i not in each element of S
+    Ts: A repl x 2 matrix of the m-r+1 smallest test statistics we observed
+    S: A list of lists containing all the ways to some combination T1, ..., Tm corresponding to T_(1:m-r+1), and some ordered sets
+    corresponding to the remaining order stats
     N: The number of Monte Carlo simulations to run for the sampling
     f: the function to use on the samples, takes in a N x n-r+1 dimensional matrix (N = 1, 2, ...)
     null_theta: repl x n matrix of theta_hats for each observation
-    cond_thres: repl x 1 vector of the observed T_(n-r+2), sets truncation for truncated normal sampling
     '''
     lower_tail = cdf(Ts, loc = 0)
     Ts_pvals = 2*np.abs((lower_tail >= 0.5)-lower_tail)
@@ -571,38 +538,28 @@ def cpch_mc(Ts, S, H, f, pdf, cdf, trunc_rvs, null_theta, T_big, N):
     cond_thres = T_big[:,0]
     joint_probs, null_ts_probs = [], []
     for i in np.arange(len(S)):
-        #keeps track of the theta values that correspond to the sets of order statistics
-
-        #each S[i][0] represents the set of X_i corresponding to the smallest order statistics
         small = S[i][0]
-        #indices: 1D array of indices corresponding to each X_i that correspond to the smallest order statistics
         indices = np.array(small) - 1
-        #so we take these indices, and subset each row of theta_hat with this indices vector
-        #this gives us a repl x m-r+1 matrix of the predicted theta for the X_i corresponding to the smallest test statistics
         small_theta = null_theta[:,indices]
-        #S[i][1]-1 represents the index of the X_i that corresponds to the m-r+2 order stat
-        #gives a repl x 1 array (picks out the S[i][1]-1th column of null_theta)
-        theta_thres = null_theta[:, S[i][1]-1]
-        #get list of theta corresponding to X_i larger than T_{(m-r+2)}, as long as it is not empty
-        if H[i] != []:
-            #np.array(H[i]) - 1: 1D array of indices that correspond to the order statistics m-r+3 and beyond
-            l_indices = np.array(H[i]) - 1
-            #so we take these indices, and subset each row of theta_hat with this indices vector
-            #this gives us a repl x r-2 matrix of the predicted theta for the X_i corresponding to the largest test statistics
-            large_theta = null_theta[:,l_indices]
-        else:
+        theta_thres = null_theta[:, list(S[i][1])[0]-1]
+        if len(S[i][1]) == 1:
             large_theta = []
-        # # calculate P(B_i = 1|T_big) terms
-        joint_prob_i = pdf(cond_thres, loc = theta_thres) #+ pdf(-cond_thres,loc = theta_thres)
-        s_probs = cdf(np.abs(cond_thres).reshape(repl, 1), loc = small_theta) - cdf(-np.abs(cond_thres).reshape(repl, 1), loc = small_theta)
+        else:
+            l_indices = np.array(list(S[i][1])[1:]) - 1
+            large_theta = null_theta[:,l_indices]
+
+        # # calculate P(B_i|T_{(m-r+2:m)}) terms
+        joint_prob_i = norm.pdf(cond_thres, loc = theta_thres, scale = 1)
+        s_probs = norm.cdf(np.abs(cond_thres).reshape(repl, 1), loc = small_theta, scale = 1) - norm.cdf(-np.abs(cond_thres).reshape(repl, 1), loc = small_theta, scale = 1)
+        #multiply together the columns so you're multiplying across the small_theta
         joint_prob_i *= np.prod(s_probs, axis = 1)
-        if H[0] != []:
-            l_probs = pdf(T_big[:,1:], loc = large_theta)# + pdf(-T_big[:,1:],loc = large_theta)
+        if len(S[i][1]) > 1:
+            l_probs = norm.pdf(T_big[:,1:], loc = large_theta, scale = 1)
             joint_prob_i *= np.prod(l_probs, axis = 1)
         #joint probs will be a len(S) x repl matrix
         joint_probs.append(joint_prob_i)
 
-        #calculate P(f(T_small) > f(observed_T_small)|T_big) terms
+        #calculate P(f(T_(1:m-r+1)) > f^obs|T_{(m-r+2:m)}) terms
         # #sample from truncnorm with corresponding null_theta
         null_samples, null_pvals = [], []
 
@@ -659,16 +616,16 @@ def cpch(T, m, r, f, pdf = norm.pdf, cdf = None, trunc_rvs = None, N = 10000, do
     if m == 2 and r == 2 and pdf == norm.pdf:
         return (cpch_m2_r2(T, m, r))
     S = generate_S(m, r)
-    H = get_S_complement(m, S)
+    #H = get_S_complement(m, S)
     T_big = get_T_big(T, m, r)
     thetahat, Ts = get_thetahat_T_small(T, m, r)
     if pdf == norm.pdf:
-        cpch_pvals = cpch_mc_norm(Ts, S, H, f, thetahat, T_big, N)
+        cpch_pvals = cpch_mc_norm(Ts, S, f, thetahat, T_big, N)
     elif pdf == t.pdf:
         df_Ts = get_df_t_dist(T, m, r, dof)
-        cpch_pvals = cpch_mc_t(Ts, S, H, f, dof, thetahat, T_big, N, df_Ts)
+        cpch_pvals = cpch_mc_t(Ts, S, f, dof, thetahat, T_big, N, df_Ts)
     else:
-        cpch_pvals = cpch_mc(Ts, S, H, f, pdf, cdf, trunc_rvs, thetahat, cond_thres, N)
+        cpch_pvals = cpch_mc(Ts, S, f, pdf, cdf, trunc_rvs, thetahat, cond_thres, N)
     return (cpch_pvals)
 
 
@@ -694,16 +651,16 @@ def cpch_oracle(T, m, r, f, true_loc, pdf = norm.pdf, cdf = None, trunc_rvs = No
     if pdf == t.pdf and dof == []:
         raise ValueError("pdf is t.pdf but no DOF matrix provided")
     S = generate_S(m, r)
-    H = get_S_complement(m, S)
+    #H = get_S_complement(m, S)
     repl = T.shape[0]
     T_big = get_T_big(T, m, r)
     thetahat, Ts = get_thetahat_T_small(T, m, r)
     oracle_theta = get_oracle_theta(true_loc, T, m, r)
     if pdf == norm.pdf:
-        cpch_pvals =  cpch_mc_norm(Ts, S, H, f, oracle_theta, T_big, N)
+        cpch_pvals =  cpch_mc_norm(Ts, S, f, oracle_theta, T_big, N)
     elif pdf == t.pdf:
         df_Ts = get_df_t_dist(T, m, r, dof)
-        cpch_pvals = cpch_mc_t(Ts, S, H, f, dof, oracle_theta, T_big, N, df_Ts)
+        cpch_pvals = cpch_mc_t(Ts, S, f, dof, oracle_theta, T_big, N, df_Ts)
     else:
-        cpch_pvals = cpch_mc(Ts, S, H, f, pdf, cdf, trunc_rvs, oracle_theta, cond_thres, N)
+        cpch_pvals = cpch_mc(Ts, S, f, pdf, cdf, trunc_rvs, oracle_theta, cond_thres, N)
     return (cpch_pvals)
