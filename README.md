@@ -1,6 +1,6 @@
 # cPCH: Powerful Partial Conjunction Hypothesis Testing via Conditioning
 
-Conditional Partial Conjunction Hypothesis (cPCH) testing is a new method for testing a single partial conjunction hypothesis that directly corrects the conservativeness of standard approaches by conditioning on certain order statistics of the base p-values. For details about the methodology, check out our paper:
+Conditional Partial Conjunction Hypothesis (cPCH) testing is a new method for testing a single partial conjunction hypothesis that directly corrects the conservativeness of standard approaches by conditioning on certain order statistics of the base p-values. For details about the methodology, check out our paper: https://arxiv.org/abs/2212.11304
 
 This repository contains the implementation of the cPCH test, a tutorial for its use, and all files for reproducing the results in the paper. It contains following directories and files:
 
