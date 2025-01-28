@@ -116,12 +116,12 @@ def sgd(m, r, f, alpha, N=500):
         if tt % 10 == 0:
             print(f'epoch: {tt}, learn rate: {lrate}')
         if tt < 100:
-            K = 1e3
+            K = 1e4
             # K = 96*1280
         elif tt < 150:
-            K = 1e4
+            K = 1e5
         else:
-            K = 3e4#1e5
+            K = 1e5
         K = int(K)
         K_seq.append(K)
         ## shuffle for mini batch
@@ -144,7 +144,7 @@ def sgd(m, r, f, alpha, N=500):
         gradnorm_seq.append(npnorm(grads.mean(axis=0), np.inf))
     mu_seq = np.vstack(mu_seq)
     print('final epoch error:', err_seq[-1])
-    print('se cal:', np.sqrt(1/20/K))
+    print('se cal:', np.sqrt(alpha/K))
     print('max type I error:', err_seq[-1], 'at mu =', mu_seq[-1,:])
     return(err_seq[-1])
 
@@ -175,35 +175,35 @@ alpha_primes = []
 t1_err_at_alpha_prime = []
 if alpha >= 0.04:
     f=f_fisher
-    alpha_prime_fisher = binary_search(m=m, r=r, f=f_fisher, nominal_alpha=alpha, threshold=0.004, low_alpha=alpha-0.03, high_alpha=alpha)
+    alpha_prime_fisher = binary_search(m=m, r=r, f=f_fisher, nominal_alpha=alpha, threshold=0.002, low_alpha=alpha/2, high_alpha=alpha)
     print("Fisher alpha'" + str(alpha_prime_fisher[0]))
     alpha_primes.append(alpha_prime_fisher[0])
     t1_err_at_alpha_prime.append(alpha_prime_fisher[1])
     f=f_simes
-    alpha_prime_simes = binary_search(m=m, r=r, f=f_simes, nominal_alpha=alpha, threshold=0.004, low_alpha=alpha-0.03, high_alpha=alpha)
+    alpha_prime_simes = binary_search(m=m, r=r, f=f_simes, nominal_alpha=alpha, threshold=0.002, low_alpha=alpha/2, high_alpha=alpha)
     print("Simes alpha'" + str(alpha_prime_simes[0]))
     alpha_primes.append(alpha_prime_simes[0])
     t1_err_at_alpha_prime.append(alpha_prime_simes[1])
 elif alpha < 0.04 & alpha >=0.005:
     f=f_fisher
-    alpha_prime_fisher = binary_search(m=m, r=r, f=f_fisher, nominal_alpha=alpha, threshold=alpha/3, low_alpha=alpha/2, high_alpha=alpha)
+    alpha_prime_fisher = binary_search(m=m, r=r, f=f_fisher, nominal_alpha=alpha, threshold=0.0008, low_alpha=alpha/2, high_alpha=alpha)
     print("Fisher alpha'" + str(alpha_prime_fisher[0]))
     alpha_primes.append(alpha_prime_fisher[0])
     t1_err_at_alpha_prime.append(alpha_prime_fisher[1])
     f=f_simes
-    alpha_prime_simes = binary_search(m=m, r=r, f=f_simes, nominal_alpha=alpha, threshold=alpha/3, low_alpha=alpha/2, high_alpha=alpha)
+    alpha_prime_simes = binary_search(m=m, r=r, f=f_simes, nominal_alpha=alpha, threshold=0.0008, low_alpha=alpha/2, high_alpha=alpha)
     print("Simes alpha'" + str(alpha_prime_simes[0]))
     alpha_primes.append(alpha_prime_simes[0])  
     t1_err_at_alpha_prime.append(alpha_prime_simes[1])
 elif alpha < 0.005:
     f=f_fisher
     N=2000 #need to set N larger to make sure p-values can attain values below alpha
-    alpha_prime_fisher = binary_search(m=m, r=r, f=f_fisher, nominal_alpha=alpha, threshold=alpha/3, low_alpha=alpha/2, high_alpha=alpha)
+    alpha_prime_fisher = binary_search(m=m, r=r, f=f_fisher, nominal_alpha=alpha, threshold=0.0001, low_alpha=alpha/2, high_alpha=alpha)
     print("Fisher alpha'" + str(alpha_prime_fisher[0]))
     alpha_primes.append(alpha_prime_fisher[0])
     t1_err_at_alpha_prime.append(alpha_prime_fisher[1])
     f=f_simes
-    alpha_prime_simes = binary_search(m=m, r=r, f=f_simes, nominal_alpha=alpha, threshold=alpha/3, low_alpha=alpha/2, high_alpha=alpha)
+    alpha_prime_simes = binary_search(m=m, r=r, f=f_simes, nominal_alpha=alpha, threshold=0.0001, low_alpha=alpha/2, high_alpha=alpha)
     print("Simes alpha'" + str(alpha_prime_simes[0]))
     alpha_primes.append(alpha_prime_simes[0])  
     t1_err_at_alpha_prime.append(alpha_prime_simes[1])
